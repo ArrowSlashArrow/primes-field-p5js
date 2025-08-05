@@ -1,77 +1,96 @@
 let WIDTH = window.innerWidth;
 let HEIGHT = window.innerHeight;
 
-let offset = 0;
-let rect_size = 2.718281828459045; // eulers number
-let image_offset = 0;
-
-let X_LIM = Math.ceil(WIDTH / rect_size);
-let Y_LIM = Math.ceil(HEIGHT / rect_size);
-
-let inverted = false;
-
-    
-function setup() {
-  createCanvas(WIDTH, HEIGHT);
-  background(0);
-  noStroke();
-
-  frameRate(60);
-}   
-
-function rand_colour(seed, inverted = false)  {
-    if (seed == 0) {return color(0, 0, 0, 255);}
-    let red = ((seed * 15) >> 3) % 256;
-    let green = ((seed * 85) >> 4) % 256;
-    let blue = ((seed * 72) >> 7) % 256;
-    if (!inverted) {return color(red, green, blue, 255);}
-    return color(255 - red, 255 - green, 255 - blue, 255);
+function min(a, b) {
+    return a < b ? a : b
 }
 
-function is_prime(n) {
-    if (n <= 1) return false;
-    if (n <= 3) return true;
+let frag_shader;
 
-    // Check divisibility up to the square root of n
-    for (let i = 2; i * i <= n; i++) {
-        if (n % i === 0) return false;
+let RADIUS = min(WIDTH, HEIGHT) / 4;
+
+let total_time = 3600;
+let LINE_COUNT = Math.floor(total_time / 15);
+
+let TO_RADIANS = Math.PI / 180;
+
+let font;
+function preload() {
+    frag_shader = loadShader("shader.vert", "shader.frag");
+    font = loadFont('assets/JetBrainsMono-Italic.ttf');
+    
+}
+
+function setup() {
+    createCanvas(WIDTH, HEIGHT, WEBGL);
+    background(0);
+    frameRate(60);
+    stroke(1);
+    
+    textSize(40);
+    textFont(font);
+    drawingContext.disable(drawingContext.DEPTH_TEST);
+}   
+
+function draw_lines() {
+    // get relative time to start and convert it to an angle measurement
+    var seconds = millis() / 1000;
+    var elapsed_time = (seconds / total_time) % 1;
+    console.log(seconds, elapsed_time);
+    var angle = elapsed_time * 360 * TO_RADIANS;
+
+    // adjust drawing settings for line
+    stroke(255);
+    strokeWeight(2);
+
+    
+    for (let i = 0; i < LINE_COUNT; i++) { 
+        // get all line position arguments
+        let x_start = RADIUS * Math.sin(angle * i);
+        let y_start = RADIUS * Math.cos(angle * i);
+        let x_end = RADIUS * Math.sin(angle * (i + 1));
+        let y_end = RADIUS * Math.cos(angle * (i + 1));
+        
+        line(x_start, y_start, x_end, y_end);
     }
-    return true;
+
+    // adjust drawing settings for text
+    textAlign(LEFT, CENTER);
+    strokeWeight(4);
+    fill(255);
+    stroke(0);
+
+    // get current time and convert it to a string  
+    let current_time = new Date();
+    let time_str = current_time.toLocaleDateString() + " " + current_time.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false});
+    
+    // render the text at the centre of the screen
+    text(time_str, -WIDTH / 2 + 20, HEIGHT / 2 - 40)
+
 }
 
 function draw() {
-    background(255 * inverted);
-    for (let i = -rect_size; i < X_LIM + 1; i++) {
-        for (let j = -rect_size; j < Y_LIM + 1; j++) {
-            let n = (i + offset) ^ (j + offset + 8704);
-            // console.log(n);
-            if (is_prime(n)) {
-                let col = rand_colour(n, inverted);
-                // stroke(col);
-                fill(col);
-                // point(i, j);
-                rect(i * rect_size - (image_offset), j * rect_size - (image_offset), rect_size, rect_size);
-            } 
-        }
-    }
-    // if (image_offset === rect_size) {
-       offset += 1;
-    //    image_offset = 0;
-    // } else {
-    //     image_offset += 1;
-    // }
+    background(0);
+    frag_shader.setUniform("iResolution", [WIDTH, HEIGHT]);
+    frag_shader.setUniform("iTime", millis() / 1000);
+
+    push();
+    translate(0, 0, -1);
+    shader(frag_shader);
+    plane(WIDTH, HEIGHT);
+    pop();
+
+    push();
+    translate(0, 0, -1);
+    resetShader();
+    draw_lines();
+    pop();
 }
 
 function windowResized() {
     resizeCanvas(windowWidth, windowHeight);
     WIDTH = windowWidth;
     HEIGHT = windowHeight;
-    X_LIM = WIDTH / rect_size;
-    Y_LIM = HEIGHT / rect_size;
-}
 
-// function keyPressed() {
-//     if (keyCode === 73) { // "I" 
-//         inverted = !inverted;
-//     }
-// }
+    RADIUS = min(WIDTH, HEIGHT) / 4;
+}
